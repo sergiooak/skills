@@ -1,26 +1,37 @@
 ---
 name: atomic-commits
-description: "Split working-tree changes into multiple logical, atomic commits — never one giant commit — by grouping files by feature/topic, then write each commit message following Conventional Commits rules. Use when: committing changes, writing commit messages, staging files, preparing a commit for review, or directly committing. Confirms with the user before committing breaking changes."
+description: "Split working-tree changes into atomic, logical commits — never one giant commit — grouped by feature/topic, each written to Conventional Commits format. Use when committing changes or reviewing/planning a commit before executing it."
 user-invocable: true
 disable-model-invocation: false
 argument-hint: "[commit | review | plan] — 'commit' stages and commits directly, 'review' or 'plan' shows the plan for approval first"
 ---
 
-# Atomic Commits — Split Changes into Logical Commits
+# Atomic Commits
 
 ## Workflow
 
-When invoked, always follow these steps in order:
+1. **Inspect** — `git status` + `git diff` (staged and unstaged) to see everything that changed.
+2. **Group** — cluster files into atomic, logical commit units (see Grouping below). Every changed file must end up in exactly one group.
+3. **Draft messages** — one message per group, in Conventional Commits format (below).
+4. **Check breaking changes** — any group with a breaking change: pause, confirm with the user (see Breaking Changes) before proceeding.
+5. **Stage and commit** — "commit": run all commits after the breaking-change check. "review"/"plan": present the grouping and messages, wait for approval, then commit.
+6. **Summarize** — `git log --oneline -<n>` (n = commits made), show it to the user.
 
-1. **Inspect changes** — run `git status` and `git diff` (staged + unstaged) to understand what changed
-2. **Group files by topic** — cluster related files into logical commit units
-3. **Generate commit messages** — one message per group, following the format below
-4. **Check for breaking changes** — if any group contains a breaking change, pause and confirm with the user before proceeding
-5. **Stage and commit** — either commit directly or present the plan for approval, depending on the user's instruction
-6. **Show summary** — after all commits are done, run `git log --oneline -<n>` (where `n` = number of commits made) and display the output to the user
+---
 
-If the user says **"commit"** (or similar): execute all commits after the breaking-change check, then show the summary.
-If the user says **"review"** (or similar): present the grouping and messages, wait for approval before running any git commands. After commits are done, show the summary.
+## Grouping
+
+Group into the smallest commits that could be reviewed independently:
+
+- Same feature → one commit
+- Tests for a changed module → same commit as the module
+- Docs → separate `docs` commit
+- Config/tooling → separate `chore`/`build` commit
+- Formatting-only → separate `style` commit
+
+Never mix behavior changes with style or docs in one commit.
+
+**Unrelated changes in one file** (e.g. a new constant plus an unrelated fix) need splitting below the file level — see [`partial-staging.md`](./partial-staging.md).
 
 ---
 
@@ -36,19 +47,14 @@ If the user says **"review"** (or similar): present the grouping and messages, w
 [BREAKING CHANGE: <description>]
 ```
 
----
+### Header
 
-## Header Rules
+- Target ≤ 50 chars, hard limit 72: `type(scope): summary`
+- Too long? Drop articles, abbreviate, shorten verbs (`implement` → `add`, `resolve issue where` → `fix`)
 
-- **Target**: ≤ 50 chars · **Hard limit**: 72 chars
-- Formula: `type + "(" + scope + "): " + summary ≤ 50`
-- If too long: drop articles (a, the, an), abbreviate, shorten verbs (`implement` → `add`, `resolve issue where` → `fix`)
+### Types
 
----
-
-## Allowed Types
-
-| Type       | When to use                                  |
+| Type       | When to use                                 |
 |------------|----------------------------------------------|
 | `feat`     | New feature or capability                    |
 | `fix`      | Bug fix                                      |
@@ -60,82 +66,25 @@ If the user says **"review"** (or similar): present the grouping and messages, w
 | `ci`       | CI/CD pipelines                              |
 | `build`    | Build system / dependency changes            |
 
----
+### Scope
 
-## Scope Rules
+PascalCase, module/domain name — not the file name: `feat(Auth): add JWT login`. Skip it when the type is `chore`/`ci`/`build` on config files, or the change spans many unrelated domains.
 
-Use scope when **a single feature, module, or domain** is affected.
+### Body
 
-- Format: **PascalCase** — use the module/domain name, not the file name
-- Examples: `feat(Auth): add JWT login` · `fix(Api): handle null response`
+Bullet list of *what* changed, one fact per line — not *why* (that belongs in the PR description). Omit trivial details unless they affect callers. 3–6 bullets is typical; fewer if the summary already says it all.
 
-Skip scope when:
-- Type is `chore`, `ci`, or `build` AND the change is in config files
-- The change spans many unrelated domains
+### Breaking Changes
 
----
-
-## Body Rules
-
-- Bullet-point list of what changed (not why — that belongs in the PR description)
-- Keep bullets concise: one fact per line
-- Omit trivial details (e.g., "renamed variable") unless it affects callers
-- 3–6 bullets is typical; fewer is better if the summary already says it all
-
----
-
-## Breaking Changes
-
-- Add `!` after the type/scope in the header: `feat(Auth)!: remove legacy login`
-- Add footer: `BREAKING CHANGE: <what changed and what callers must do>`
-- **Always confirm with the user before creating a breaking-change commit** — ask: "This commit contains a breaking change: `<description>`. Proceed?"
-
----
-
-## Grouping Strategy
-
-Group files into the smallest coherent commits that could be reviewed independently:
-
-- Files that implement the same feature → one commit
-- Test files that cover a changed module → same commit as the module
-- Documentation updates → separate `docs` commit
-- Config/tooling changes → separate `chore` or `build` commit
-- Formatting-only changes → separate `style` commit
-
-Avoid mixing behavior changes with style or docs in the same commit.
-
-### Partial File Staging
-
-When a single file contains **unrelated changes** (e.g., a new constant + an unrelated function fix), use `git add -p` to stage only the relevant hunks per commit.
-
-**When to use partial staging:**
-- A file has changes that belong to 2+ different logical commits
-- Separators/formatting were added alongside behavior changes
-- A shared module gained functions for different features
-
-**When NOT to split:**
-- All changes in the file serve the same purpose — stage the whole file
-- Splitting would create a commit where the code doesn't compile or run
-- The hunks are too interleaved to separate cleanly
-
-**How to stage partial changes:**
-
-```bash
-# Interactive hunk selection (preferred)
-git add -p <file>
-# Options: y=stage, n=skip, s=split hunk, q=quit
-
-# Stage a specific line range via patch application
-git diff <file> | head -n <end> | tail -n <count> | git apply --cached
-```
-
-**Rule:** every commit must leave the codebase in a valid, runnable state. Never split a file in a way that breaks intermediate commits.
+- Header: `!` after type/scope — `feat(Auth)!: remove legacy login`
+- Footer: `BREAKING CHANGE: <what changed and what callers must do>`
+- Always confirm before committing: "This commit contains a breaking change: `<description>`. Proceed?"
 
 ---
 
 ## Examples
 
-### Single-module feature
+### Standard, with scope
 
 ```
 feat(FieldMatcher): add confidence threshold filtering
@@ -145,16 +94,7 @@ feat(FieldMatcher): add confidence threshold filtering
 - Update matchFields() return type to include confidence
 ```
 
-### Bug fix
-
-```
-fix(S3Service): handle missing object key on copy
-
-- Catch NoSuchKey error and log as soft error
-- Return null instead of throwing to continue batch
-```
-
-### Docs only
+### No scope (cross-cutting docs)
 
 ```
 docs: add bilingual OCR pipeline documentation
