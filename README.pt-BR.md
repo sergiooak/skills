@@ -25,8 +25,8 @@ npx skills add sergiooak/skills
 Ou instalar uma só:
 
 ```
-npx skills add sergiooak/skills/atomic-commits
-npx skills add sergiooak/skills/git-safe-rename
+npx skills add sergiooak/skills --skill atomic-commits
+npx skills add sergiooak/skills --skill git-safe-rename
 ```
 
 - [`atomic-commits`](./skills/atomic-commits/SKILL.md) — divide as mudanças da working tree em múltiplos commits lógicos e atômicos (nunca um commit gigante só), agrupados por feature/tópico, e escreve cada mensagem seguindo as regras do Conventional Commits.
